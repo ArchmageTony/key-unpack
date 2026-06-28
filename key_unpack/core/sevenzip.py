@@ -44,9 +44,13 @@ class SevenZipRunner:
         cancel_token: CancelToken | None = None,
     ) -> SevenZipResult:
         args = [self.executable, "t", str(archive)]
+        input_text = None
         if password is not None:
-            args.append(f"-p{password}")
-        return self._run(args, cancel_token=cancel_token)
+            if _password_requires_stdin(password):
+                input_text = f"{password}\n"
+            else:
+                args.append(f"-p{password}")
+        return self._run(args, cancel_token=cancel_token, input_text=input_text)
 
     def extract_archive(
         self,
@@ -58,9 +62,13 @@ class SevenZipRunner:
     ) -> SevenZipResult:
         Path(output_dir).mkdir(parents=True, exist_ok=True)
         args = [self.executable, "x", str(archive), f"-o{output_dir}", "-y"]
+        input_text = None
         if password is not None:
-            args.append(f"-p{password}")
-        return self._run(args, cancel_token=cancel_token)
+            if _password_requires_stdin(password):
+                input_text = f"{password}\n"
+            else:
+                args.append(f"-p{password}")
+        return self._run(args, cancel_token=cancel_token, input_text=input_text)
 
     def extract_stego(
         self,
@@ -78,16 +86,18 @@ class SevenZipRunner:
         args: list[str],
         *,
         cancel_token: CancelToken | None,
+        input_text: str | None = None,
     ) -> SevenZipResult:
         start = time.monotonic()
         creationflags = 0
         start_new_session = os.name != "nt"
         if os.name == "nt":
             creationflags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+        stdin = subprocess.PIPE if input_text is not None else subprocess.DEVNULL
         try:
             process = subprocess.Popen(
                 args,
-                stdin=subprocess.DEVNULL,
+                stdin=stdin,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
@@ -100,6 +110,14 @@ class SevenZipRunner:
             raise KeyUnpackError(ErrorCode.SEVENZIP_MISSING, f"7-Zip executable not found: {args[0]}") from exc
         except PermissionError as exc:
             raise KeyUnpackError(ErrorCode.PERMISSION_DENIED, f"Cannot execute 7-Zip: {args[0]}") from exc
+
+        if input_text is not None and process.stdin is not None:
+            try:
+                process.stdin.write(input_text)
+                process.stdin.close()
+            except (BrokenPipeError, OSError, ValueError):
+                pass
+            process.stdin = None
 
         try:
             while True:
@@ -159,6 +177,10 @@ class SevenZipRunner:
         raise KeyUnpackError(ErrorCode.SEVENZIP_MISSING, "7-Zip executable not found")
 
 
+def _password_requires_stdin(password: str) -> bool:
+    return '"' in password
+
+
 def classify_result(result: SevenZipResult) -> ErrorCode | None:
     if result.returncode == 0:
         return None
@@ -167,6 +189,8 @@ def classify_result(result: SevenZipResult) -> ErrorCode | None:
     text = result.output.lower()
     if result.timed_out:
         return ErrorCode.UNKNOWN_ERROR
+    if "enter password" in text and "break signaled" in text:
+        return ErrorCode.BAD_PASSWORD
     if "wrong password" in text or ("encrypted" in text and "password" in text):
         return ErrorCode.BAD_PASSWORD
     if "missing volume" in text or "cannot find volume" in text:

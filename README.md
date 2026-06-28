@@ -1,6 +1,6 @@
 # Key Unpack
 
-Key Unpack 是一个用于公开分享资源解压密码管理和自动试解的 Python 工具。
+Key Unpack 是一个用于压缩包密码管理和自动试解的 Python 工具。
 当前版本只包含 v1 的 core 和 CLI, 不包含桌面 UI, 压缩功能, 在线密码源,
 以及自动递归多层解压。
 
@@ -12,7 +12,6 @@ Key Unpack 是一个用于公开分享资源解压密码管理和自动试解的
 - 解压前先通过 7-Zip 测试候选密码, 成功后只执行一次正式解压.
 - 使用 JSONL 记录成功解压日志.
 - 支持中文密码编码兼容候选, 默认启用.
-- 支持通过 7-Zip `-t#` 对 MP4 尾部拼接压缩包做一层外壳剥离.
 - 支持批量解压, 输出逐文件任务事件, 部分失败时返回非零退出码.
 - 支持常见分卷压缩包的主卷归一化, 避免重复处理子卷.
 
@@ -43,13 +42,35 @@ python -m key_unpack --help
 
 ## CLI 用法
 
+查看帮助:
+
+```bash
+key-unpack --help
+key-unpack extract --help
+key-unpack password --help
+key-unpack config --help
+```
+
+指定数据目录:
+
+```bash
+key-unpack --data-dir <dir> <command>
+```
+
 解压一个或多个压缩包:
 
 ```bash
 key-unpack extract <archive>
 key-unpack extract <archive1> <archive2>
 key-unpack extract <archive> --output <dir>
+key-unpack extract <archive> --overwrite skip
+key-unpack extract <archive> --overwrite overwrite
 key-unpack extract <archive> --overwrite rename
+key-unpack extract <archive> --overwrite fail
+key-unpack extract <archive> --sevenzip <path-to-7zip>
+key-unpack extract <archive> --temp-dir <dir>
+key-unpack extract <archive> --no-encoding-compat
+key-unpack extract <archive> --json
 ```
 
 管理密码:
@@ -63,20 +84,21 @@ key-unpack password list
 key-unpack password cleanup
 ```
 
-配置自定义 7-Zip 路径:
+管理配置:
 
 ```bash
 key-unpack config set sevenzip_path <path-to-7zip>
-```
-
-常用解压选项:
-
-```bash
-key-unpack extract <archive> --sevenzip <path-to-7zip>
-key-unpack extract <archive> --temp-dir <dir>
-key-unpack extract <archive> --no-stego
-key-unpack extract <archive> --no-encoding-compat
-key-unpack extract <archive> --json
+key-unpack config set output_dir <dir>
+key-unpack config set temp_dir <dir>
+key-unpack config set default_password_type one_time
+key-unpack config set temporary_password_days 7
+key-unpack config set strip_imported_passwords true
+key-unpack config set enable_password_encoding_compat true
+key-unpack config set log_success_password true
+key-unpack config set max_log_records 1000
+key-unpack config set max_log_bytes 1048576
+key-unpack config set command_timeout_seconds 300
+key-unpack config list
 ```
 
 ## 数据文件
@@ -92,8 +114,8 @@ key-unpack extract <archive> --json
 - `extract_log.jsonl`: 成功解压日志.
 - `backups/`: 密码库修改前的滚动备份.
 
-密码记录以明文 JSONL 保存。该工具只适合保存公开资源解压密码, 不应保存私人
-账号密码或其他敏感凭据。成功解压日志默认也可能记录命中的密码。
+密码记录以明文 JSONL 保存。该工具只适合保存允许明文存储的压缩包密码, 不应
+保存私人账号密码或其他敏感凭据。成功解压日志默认也可能记录命中的密码。
 
 ## 退出码
 
