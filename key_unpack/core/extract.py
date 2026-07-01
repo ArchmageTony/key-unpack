@@ -156,9 +156,12 @@ def _extract_one(
     )
     temp_parent = request.temp_dir or app_config.temp_dir
     task_temp = Path(tempfile.mkdtemp(prefix="key-unpack-", dir=temp_parent))
+    configured_output_dir = None
+    if app_config.config.get("output_strategy") == "fixed":
+        configured_output_dir = app_config.local.get("output_dir")
     output_base = resolve_output_base(
         archive_input.requested_path,
-        output_dir=request.output_dir or app_config.local.get("output_dir"),
+        output_dir=request.output_dir or configured_output_dir,
         file_count=file_count,
     )
     enable_compat = (

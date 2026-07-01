@@ -170,6 +170,38 @@ class PasswordStore:
             self._write_records(kept, backup=True)
         return removed
 
+    def update_record(
+        self,
+        record_id: str,
+        *,
+        password: str,
+        password_type: str,
+    ) -> bool:
+        if password_type not in PASSWORD_TYPES:
+            raise ValueError(f"Invalid password type: {password_type}")
+        records = self.load(include_expired=True)
+        changed = False
+        for record in records:
+            if record.id == record_id:
+                record.password = password
+                record.type = password_type
+                changed = True
+                break
+        if changed:
+            self._write_records(records, backup=True)
+        return changed
+
+    def delete_records(self, record_ids: Iterable[str]) -> int:
+        ids = set(record_ids)
+        if not ids:
+            return 0
+        records = self.load(include_expired=True)
+        kept = [record for record in records if record.id not in ids]
+        removed = len(records) - len(kept)
+        if removed:
+            self._write_records(kept, backup=True)
+        return removed
+
     def mark_success(self, candidate: PasswordCandidate) -> bool:
         if candidate.original_password is None:
             return False
