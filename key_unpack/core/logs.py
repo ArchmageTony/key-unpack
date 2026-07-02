@@ -12,23 +12,13 @@ from .passwords import now_iso
 
 
 def append_success_log(paths: DataPaths, result: TaskResult, config: dict[str, Any]) -> None:
+    if result.success_password is None or not config.get("log_success_password", True):
+        return
     payload: dict[str, Any] = {
-        "archive_name": Path(result.input_file).name,
-        "archive_path": result.input_file,
-        "processed_file": result.processed_file,
         "extracted_at": now_iso(),
-        "output_dir": result.output_dir,
-        "password_source": result.password_source,
-        "used_encoding_variant": result.used_encoding_variant,
-        "encoding_variant_name": result.encoding_variant_name,
-        "stego_embedded_file": result.stego_embedded_file,
+        "archive_name": Path(result.input_file).name,
+        "password": result.success_password,
     }
-    if config.get("log_success_password", True):
-        payload["password"] = result.success_password
-        payload["original_password"] = result.original_password
-    else:
-        payload["password"] = None
-        payload["original_password"] = None
 
     paths.extract_log_path.parent.mkdir(parents=True, exist_ok=True)
     with paths.extract_log_path.open("a", encoding="utf-8", newline="\n") as handle:

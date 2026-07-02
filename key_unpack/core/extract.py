@@ -19,6 +19,7 @@ from .paths import (
 )
 from .sevenzip import SevenZipRunner, classify_result
 from .stego import find_embedded_archives, is_video_candidate
+from .zip_fallback import extract_zip_archive, is_zip_archive, test_zip_archive
 
 OVERWRITE_POLICIES = ("skip", "overwrite", "rename", "fail")
 
@@ -289,6 +290,7 @@ def _try_archive(
     password_count = len(candidates)
     failed_codes: list[ErrorCode] = []
     matched: PasswordCandidate | None = None
+    use_zip_fallback = False
     for password_index, candidate in enumerate(candidates, start=1):
         yield TaskEvent(
             type="password_test",
@@ -310,6 +312,17 @@ def _try_archive(
         if error is None:
             matched = candidate
             break
+        if (
+            error == ErrorCode.BAD_PASSWORD
+            and candidate.password is not None
+            and is_zip_archive(archive_path)
+        ):
+            zip_error = test_zip_archive(archive_path, candidate.password)
+            if zip_error is None:
+                matched = candidate
+                use_zip_fallback = True
+                break
+            error = zip_error
         if error == ErrorCode.CANCELED:
             raise KeyUnpackError(ErrorCode.CANCELED, "Canceled")
         failed_codes.append(error)
@@ -337,13 +350,16 @@ def _try_archive(
         file_count=file_count,
         message="Extracting archive",
     )
-    extract_result = runner.extract_archive(
-        archive_path,
-        extract_dir,
-        password=matched.password,
-        cancel_token=request.cancel_token,
-    )
-    extract_error = classify_result(extract_result)
+    if use_zip_fallback and matched.password is not None:
+        extract_error = extract_zip_archive(archive_path, extract_dir, matched.password)
+    else:
+        extract_result = runner.extract_archive(
+            archive_path,
+            extract_dir,
+            password=matched.password,
+            cancel_token=request.cancel_token,
+        )
+        extract_error = classify_result(extract_result)
     if extract_error is not None:
         return TaskResult(
             input_file=str(input_file),

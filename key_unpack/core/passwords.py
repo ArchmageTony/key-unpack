@@ -115,18 +115,32 @@ class PasswordStore:
         if password_type not in PASSWORD_TYPES:
             raise ValueError(f"Invalid password type: {password_type}")
         records = self.load()
-        existing = {record.password for record in records}
+        existing = {record.password: record for record in records}
         created_at = now_iso()
-        expires_at = None
-        if password_type == "temporary":
-            expires_at = (
-                datetime.now(timezone.utc).astimezone() + timedelta(days=temporary_days)
-            ).isoformat(timespec="seconds")
 
-        added = 0
+        changed = 0
+        seen_in_import: set[str] = set()
         for raw in passwords:
             password = raw.strip() if strip else raw.rstrip("\r\n")
-            if not password or password in existing:
+            if not password or password in seen_in_import:
+                continue
+            seen_in_import.add(password)
+            expires_at = None
+            if password_type == "temporary":
+                expires_at = (
+                    datetime.now(timezone.utc).astimezone() + timedelta(days=temporary_days)
+                ).isoformat(timespec="seconds")
+            current = existing.get(password)
+            if current is not None:
+                if (
+                    current.type != password_type
+                    or current.expires_at != expires_at
+                    or current.source != source
+                ):
+                    current.type = password_type
+                    current.expires_at = expires_at
+                    current.source = source
+                    changed += 1
                 continue
             records.append(
                 PasswordRecord(
@@ -139,11 +153,11 @@ class PasswordStore:
                     last_used_at=None,
                 )
             )
-            existing.add(password)
-            added += 1
-        if added:
+            existing[password] = records[-1]
+            changed += 1
+        if changed:
             self._write_records(records, backup=True)
-        return added
+        return changed
 
     def import_file(
         self,

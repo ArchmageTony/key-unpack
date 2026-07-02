@@ -8,7 +8,15 @@ from pathlib import Path
 from typing import Any
 
 from PySide6.QtCore import QThread, Qt, Signal
-from PySide6.QtGui import QCloseEvent, QDragEnterEvent, QDropEvent, QFont, QFontDatabase
+from PySide6.QtGui import (
+    QColor,
+    QCloseEvent,
+    QDragEnterEvent,
+    QDropEvent,
+    QFont,
+    QFontDatabase,
+    QPalette,
+)
 from PySide6.QtWidgets import (
     QApplication,
     QAbstractItemView,
@@ -53,8 +61,8 @@ TYPE_LABELS = {
 STAGE_LABELS = {
     "detecting": "检测文件",
     "testing_password": "测试密码",
-    "testing_embedded_password": "测试内嵌压缩包密码",
-    "extracting_stego": "提取隐写压缩包",
+    "testing_embedded_password": "测试压缩包密码",
+    "extracting_stego": "检测压缩包",
     "extracting": "正在解压",
     "completed": "完成",
     "failed": "失败",
@@ -69,7 +77,7 @@ ERROR_LABELS = {
     "volume_missing": "分卷缺失",
     "permission_denied": "权限不足",
     "file_conflict": "文件冲突",
-    "stego_not_found": "未找到可处理的隐写压缩包",
+    "stego_not_found": "格式不支持或不是压缩包",
     "canceled": "已取消",
     "unknown_error": "未知错误",
 }
@@ -79,6 +87,20 @@ _APP_FONT_APPLIED = False
 
 def apply_default_font(app: QApplication) -> None:
     global _APP_FONT_APPLIED
+    app.setStyle("Fusion")
+    palette = app.palette()
+    palette.setColor(QPalette.Window, QColor("#f5f6f8"))
+    palette.setColor(QPalette.WindowText, QColor("#20242a"))
+    palette.setColor(QPalette.Base, QColor("#ffffff"))
+    palette.setColor(QPalette.AlternateBase, QColor("#f8fafc"))
+    palette.setColor(QPalette.Text, QColor("#20242a"))
+    palette.setColor(QPalette.Button, QColor("#ffffff"))
+    palette.setColor(QPalette.ButtonText, QColor("#20242a"))
+    palette.setColor(QPalette.Highlight, QColor("#2563eb"))
+    palette.setColor(QPalette.HighlightedText, QColor("#ffffff"))
+    palette.setColor(QPalette.ToolTipBase, QColor("#ffffff"))
+    palette.setColor(QPalette.ToolTipText, QColor("#20242a"))
+    app.setPalette(palette)
     if _APP_FONT_APPLIED or sys.platform != "win32":
         return
     _APP_FONT_APPLIED = True
@@ -161,7 +183,7 @@ class DropArea(QFrame):
         self.setObjectName("dropArea")
         self.setFrameShape(QFrame.StyledPanel)
         layout = QVBoxLayout(self)
-        title = QLabel("拖入压缩包或隐写视频")
+        title = QLabel("拖入压缩包")
         title.setAlignment(Qt.AlignCenter)
         title.setObjectName("dropTitle")
         subtitle = QLabel("支持批量拖拽, 子卷会归一到主卷处理")
@@ -197,7 +219,7 @@ class MainWindow(QMainWindow):
         self.config = AppConfig.load(data_dir)
         self.store = PasswordStore(self.config.paths)
         self.worker: ExtractWorker | None = None
-        self.task_rows: dict[str, TaskRow] = {}
+        self.active_task_rows: dict[str, TaskRow] = {}
         self.setWindowTitle("Key Unpack")
         self.resize(920, 640)
         self._build_ui()
@@ -269,6 +291,113 @@ class MainWindow(QMainWindow):
                 border: 1px solid #d7dbe2;
                 padding: 3px;
             }
+            QTableView QTableCornerButton::section, QTableWidget QTableCornerButton::section {
+                background: #f1f3f5;
+                border: 1px solid #d7dbe2;
+            }
+            QAbstractScrollArea, QAbstractScrollArea > QWidget > QWidget {
+                color: #20242a;
+                background: #ffffff;
+                border: 1px solid #d7dbe2;
+            }
+            QScrollBar:horizontal, QTableView QScrollBar:horizontal, QTableWidget QScrollBar:horizontal {
+                background: #f1f3f5;
+                border: 0;
+                margin: 0 0 0 0;
+                height: 14px;
+            }
+            QScrollBar:vertical, QTableView QScrollBar:vertical, QTableWidget QScrollBar:vertical {
+                background: #f1f3f5;
+                border: 0;
+                margin: 0 0 0 0;
+                width: 14px;
+            }
+            QScrollBar::handle:horizontal, QTableView QScrollBar::handle:horizontal,
+            QTableWidget QScrollBar::handle:horizontal {
+                background: #c8ced8;
+                border-radius: 3px;
+                min-width: 24px;
+                min-height: 12px;
+            }
+            QScrollBar::handle:vertical, QTableView QScrollBar::handle:vertical,
+            QTableWidget QScrollBar::handle:vertical {
+                background: #c8ced8;
+                border-radius: 3px;
+                min-height: 24px;
+                min-width: 12px;
+            }
+            QScrollBar::handle:horizontal:hover, QScrollBar::handle:vertical:hover {
+                background: #98a2b3;
+            }
+            QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal,
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                background: #f1f3f5;
+                border: 0;
+                width: 0;
+                height: 0;
+            }
+            QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal,
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+                background: #f1f3f5;
+            }
+            QRadioButton::indicator {
+                width: 14px;
+                height: 14px;
+                border-radius: 7px;
+                border: 1px solid #98a2b3;
+                background: #ffffff;
+            }
+            QRadioButton::indicator:checked {
+                border: 1px solid #98a2b3;
+                background: qradialgradient(
+                    cx: 0.5, cy: 0.5, radius: 0.5,
+                    fx: 0.5, fy: 0.5,
+                    stop: 0 #2563eb,
+                    stop: 0.42 #2563eb,
+                    stop: 0.44 #ffffff,
+                    stop: 1 #ffffff
+                );
+            }
+            QCheckBox::indicator {
+                width: 13px;
+                height: 13px;
+                border: 1px solid #98a2b3;
+                background: #ffffff;
+            }
+            QCheckBox::indicator:checked {
+                background: #2563eb;
+                border-color: #2563eb;
+            }
+            QLineEdit {
+                color: #20242a;
+                background: #ffffff;
+                selection-color: #ffffff;
+                selection-background-color: #2563eb;
+                border: 1px solid #c8ced8;
+                border-radius: 4px;
+                min-height: 26px;
+                padding: 2px 6px;
+            }
+            QLineEdit:focus {
+                border-color: #2563eb;
+            }
+            QComboBox QAbstractItemView {
+                color: #20242a;
+                background: #ffffff;
+                selection-color: #ffffff;
+                selection-background-color: #2563eb;
+                border: 1px solid #c8ced8;
+            }
+            QMenu, QToolTip {
+                color: #20242a;
+                background: #ffffff;
+                border: 1px solid #c8ced8;
+            }
+            QDialog, QMessageBox {
+                color: #20242a;
+                background: #ffffff;
+            }
+            QDialog QLabel, QMessageBox QLabel { color: #20242a; }
             """
         )
 
@@ -285,8 +414,11 @@ class MainWindow(QMainWindow):
         self.cancel_button = QPushButton("取消任务")
         self.cancel_button.setEnabled(False)
         self.cancel_button.clicked.connect(self.cancel_extract)
+        self.clear_tasks_button = QPushButton("清空列表")
+        self.clear_tasks_button.clicked.connect(self.clear_task_rows)
         controls.addWidget(self.add_files_button)
         controls.addWidget(self.cancel_button)
+        controls.addWidget(self.clear_tasks_button)
         controls.addStretch(1)
         layout.addLayout(controls)
 
@@ -308,10 +440,9 @@ class MainWindow(QMainWindow):
 
         self.task_table = QTableWidget(0, 6)
         self.task_table.setHorizontalHeaderLabels(["文件", "状态", "进度", "当前步骤", "结果", "输出目录"])
-        self.task_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-        self.task_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
-        self.task_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Stretch)
-        self.task_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.Stretch)
+        self._configure_table(self.task_table)
+        for column, width in enumerate((180, 72, 110, 140, 220, 220)):
+            self.task_table.setColumnWidth(column, width)
         self.task_table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.task_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.task_table.setAlternatingRowColors(True)
@@ -355,9 +486,9 @@ class MainWindow(QMainWindow):
 
         self.password_table = QTableWidget(0, 6)
         self.password_table.setHorizontalHeaderLabels(["密码", "类型", "来源", "创建时间", "过期时间", "最后使用"])
-        self.password_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-        for column in range(1, 6):
-            self.password_table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeToContents)
+        self._configure_table(self.password_table)
+        for column, width in enumerate((160, 80, 110, 170, 170, 170)):
+            self.password_table.setColumnWidth(column, width)
         self.password_table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.password_table.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.password_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
@@ -445,16 +576,27 @@ class MainWindow(QMainWindow):
         buttons.addWidget(self.refresh_logs_button)
         buttons.addStretch(1)
         layout.addLayout(buttons)
-        self.log_table = QTableWidget(0, 7)
-        self.log_table.setHorizontalHeaderLabels(["时间", "文件", "密码", "原始密码", "来源", "输出目录", "隐写内嵌文件"])
-        self.log_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
-        self.log_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
-        self.log_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.Stretch)
+        self.log_table = QTableWidget(0, 3)
+        self.log_table.setHorizontalHeaderLabels(["时间", "文件", "密码"])
+        self._configure_table(self.log_table)
+        for column, width in enumerate((170, 260, 180)):
+            self.log_table.setColumnWidth(column, width)
         self.log_table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.log_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.log_table.setAlternatingRowColors(True)
         layout.addWidget(self.log_table, 1)
         return page
+
+    def _configure_table(self, table: QTableWidget) -> None:
+        header = table.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.Interactive)
+        header.setStretchLastSection(False)
+        header.setSectionsMovable(False)
+        header.sectionDoubleClicked.connect(lambda column: table.resizeColumnToContents(column))
+        table.setHorizontalScrollMode(QAbstractItemView.ScrollPerPixel)
+        table.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        table.setWordWrap(False)
+        table.setTextElideMode(Qt.ElideMiddle)
 
     def _path_row(self, line_edit: QLineEdit, button: QPushButton) -> QWidget:
         row = QWidget()
@@ -494,7 +636,7 @@ class MainWindow(QMainWindow):
                 return
 
     def choose_archives(self) -> None:
-        paths, _ = QFileDialog.getOpenFileNames(self, "选择压缩包或隐写视频")
+        paths, _ = QFileDialog.getOpenFileNames(self, "选择压缩包")
         if paths:
             self.start_extract(paths)
 
@@ -513,8 +655,9 @@ class MainWindow(QMainWindow):
             if not output_dir:
                 self.show_error("固定输出目录未设置")
                 return
-        for path in archives:
-            self._ensure_task_row(path)
+        self.active_task_rows = {}
+        for path in reversed(archives):
+            self._append_task_row(path)
         self.worker = ExtractWorker(
             archives,
             output_dir=output_dir,
@@ -540,7 +683,7 @@ class MainWindow(QMainWindow):
         current = event.current_file or (event.result.input_file if event.result else "")
         if not current:
             return
-        row = self._ensure_task_row(current).row
+        row = self._task_row_for_event(current).row
         status = "运行中"
         if event.type == "success":
             status = "成功"
@@ -571,24 +714,38 @@ class MainWindow(QMainWindow):
         self.refresh_logs()
         self.status_label.setText("任务完成, 存在失败项" if failed else "任务完成")
         self.worker = None
+        self.active_task_rows = {}
 
     def set_running(self, running: bool) -> None:
         self.add_files_button.setEnabled(not running)
         self.cancel_button.setEnabled(running)
+        self.clear_tasks_button.setEnabled(not running)
         self.store_clipboard_button.setEnabled(not running)
 
-    def _ensure_task_row(self, file_path: str) -> TaskRow:
+    def clear_task_rows(self) -> None:
+        if self.worker is not None and self.worker.isRunning():
+            return
+        self.task_table.setRowCount(0)
+        self.active_task_rows = {}
+
+    def _task_row_for_event(self, file_path: str) -> TaskRow:
         key = str(Path(file_path))
-        existing = self.task_rows.get(key)
+        existing = self.active_task_rows.get(key)
         if existing is not None:
             return existing
-        row = self.task_table.rowCount()
+        return self._append_task_row(file_path)
+
+    def _append_task_row(self, file_path: str) -> TaskRow:
+        key = str(Path(file_path))
+        for task_row in self.active_task_rows.values():
+            task_row.row += 1
+        row = 0
         self.task_table.insertRow(row)
         self.task_table.setItem(row, 0, QTableWidgetItem(Path(file_path).name))
         self.task_table.item(row, 0).setToolTip(file_path)
         self._set_task_items(row, "等待", "", "", "", "")
         task_row = TaskRow(row=row, file_path=file_path)
-        self.task_rows[key] = task_row
+        self.active_task_rows[key] = task_row
         return task_row
 
     def _set_task_items(
@@ -729,6 +886,7 @@ class MainWindow(QMainWindow):
                     item.setData(Qt.UserRole, record.id)
                 item.setToolTip(value)
                 self.password_table.setItem(row, column, item)
+        self.password_table.resizeRowsToContents()
 
     def save_settings(self) -> None:
         self.config.config["output_strategy"] = str(self.output_strategy.currentData())
@@ -773,10 +931,6 @@ class MainWindow(QMainWindow):
                 str(data.get("extracted_at") or ""),
                 str(data.get("archive_name") or ""),
                 str(data.get("password") or ""),
-                str(data.get("original_password") or ""),
-                str(data.get("password_source") or ""),
-                str(data.get("output_dir") or ""),
-                str(data.get("stego_embedded_file") or ""),
             )
             for column, value in enumerate(values):
                 item = QTableWidgetItem(value)
