@@ -19,6 +19,10 @@ def append_success_log(paths: DataPaths, result: TaskResult, config: dict[str, A
         "archive_name": Path(result.input_file).name,
         "password": result.success_password,
     }
+    if result.used_encoding_variant:
+        payload["original_password"] = result.original_password
+        payload["used_encoding_variant"] = True
+        payload["encoding_variant_name"] = result.encoding_variant_name
 
     paths.extract_log_path.parent.mkdir(parents=True, exist_ok=True)
     with paths.extract_log_path.open("a", encoding="utf-8", newline="\n") as handle:
