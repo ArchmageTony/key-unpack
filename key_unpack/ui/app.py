@@ -573,7 +573,10 @@ class MainWindow(QMainWindow):
         buttons = QHBoxLayout()
         self.refresh_logs_button = QPushButton("刷新日志")
         self.refresh_logs_button.clicked.connect(self.refresh_logs)
+        self.clear_logs_button = QPushButton("清空日志")
+        self.clear_logs_button.clicked.connect(self.clear_logs)
         buttons.addWidget(self.refresh_logs_button)
+        buttons.addWidget(self.clear_logs_button)
         buttons.addStretch(1)
         layout.addLayout(buttons)
         self.log_table = QTableWidget(0, 3)
@@ -936,6 +939,18 @@ class MainWindow(QMainWindow):
                 item = QTableWidgetItem(value)
                 item.setToolTip(value)
                 self.log_table.setItem(row, column, item)
+
+    def clear_logs(self) -> None:
+        if (
+            QMessageBox.question(self, "确认清空", "清空全部解压日志?")
+            != QMessageBox.StandardButton.Yes
+        ):
+            return
+        path = self.config.paths.extract_log_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("", encoding="utf-8")
+        self.refresh_logs()
+        self.status_label.setText("日志已清空")
 
     def choose_file_for(self, line_edit: QLineEdit) -> None:
         path, _ = QFileDialog.getOpenFileName(self, "选择文件")
