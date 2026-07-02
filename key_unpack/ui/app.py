@@ -492,6 +492,7 @@ class MainWindow(QMainWindow):
         self.password_table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.password_table.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.password_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.password_table.itemDoubleClicked.connect(lambda _item: self.edit_selected_password())
         self.password_table.setAlternatingRowColors(True)
         layout.addWidget(self.password_table, 1)
         return page
@@ -846,9 +847,20 @@ class MainWindow(QMainWindow):
         if new_password == "":
             self.show_error("密码不能为空")
             return
-        self.store.update_record(target.id, password=new_password, password_type=new_type)
+        try:
+            changed = self.store.update_record(
+                target.id,
+                password=new_password,
+                password_type=new_type,
+                temporary_days=int(self.config.config.get("temporary_password_days", 7)),
+            )
+        except ValueError as exc:
+            if str(exc) == "Password already exists":
+                self.show_error("密码已存在")
+                return
+            raise
         self.refresh_passwords()
-        self.status_label.setText("密码已修改")
+        self.status_label.setText("密码已修改" if changed else "密码未变化")
 
     def delete_selected_passwords(self) -> None:
         ids = set(self.selected_password_ids())

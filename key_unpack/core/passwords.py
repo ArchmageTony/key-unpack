@@ -25,6 +25,14 @@ def _parse_dt(value: str | None) -> datetime | None:
     return datetime.fromisoformat(value)
 
 
+def _expires_at_for_type(password_type: str, temporary_days: int) -> str | None:
+    if password_type != "temporary":
+        return None
+    return (
+        datetime.now(timezone.utc).astimezone() + timedelta(days=temporary_days)
+    ).isoformat(timespec="seconds")
+
+
 @dataclass
 class PasswordRecord:
     password: str
@@ -125,11 +133,7 @@ class PasswordStore:
             if not password or password in seen_in_import:
                 continue
             seen_in_import.add(password)
-            expires_at = None
-            if password_type == "temporary":
-                expires_at = (
-                    datetime.now(timezone.utc).astimezone() + timedelta(days=temporary_days)
-                ).isoformat(timespec="seconds")
+            expires_at = _expires_at_for_type(password_type, temporary_days)
             current = existing.get(password)
             if current is not None:
                 if (
@@ -190,15 +194,26 @@ class PasswordStore:
         *,
         password: str,
         password_type: str,
+        temporary_days: int,
     ) -> bool:
         if password_type not in PASSWORD_TYPES:
             raise ValueError(f"Invalid password type: {password_type}")
         records = self.load(include_expired=True)
+        if any(record.id != record_id and record.password == password for record in records):
+            raise ValueError("Password already exists")
+        expires_at = _expires_at_for_type(password_type, temporary_days)
         changed = False
         for record in records:
             if record.id == record_id:
+                if (
+                    record.password == password
+                    and record.type == password_type
+                    and record.expires_at == expires_at
+                ):
+                    break
                 record.password = password
                 record.type = password_type
+                record.expires_at = expires_at
                 changed = True
                 break
         if changed:
