@@ -182,6 +182,8 @@ def classify_result(result: SevenZipResult) -> ErrorCode | None:
     text = result.output.lower()
     if result.timed_out:
         return ErrorCode.UNKNOWN_ERROR
+    if "unexpected end of archive" in text and _is_split_volume_command(result.args):
+        return ErrorCode.VOLUME_MISSING
     if "enter password" in text and "break signaled" in text:
         return ErrorCode.BAD_PASSWORD
     if "wrong password" in text or ("encrypted" in text and "password" in text):
@@ -201,3 +203,8 @@ def classify_result(result: SevenZipResult) -> ErrorCode | None:
     if "data error" in text or "crc failed" in text:
         return ErrorCode.ARCHIVE_CORRUPT
     return ErrorCode.UNKNOWN_ERROR
+
+
+def _is_split_volume_command(args: list[str]) -> bool:
+    suffixes = (".7z.001", ".zip.001")
+    return any(arg.lower().endswith(suffixes) for arg in args)
