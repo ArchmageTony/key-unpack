@@ -44,13 +44,9 @@ class SevenZipRunner:
         cancel_token: CancelToken | None = None,
     ) -> SevenZipResult:
         args = [self.executable, "t", str(archive)]
-        input_text = None
         if password is not None:
-            if _password_requires_stdin(password):
-                input_text = f"{password}\n"
-            else:
-                args.append(f"-p{password}")
-        return self._run(args, cancel_token=cancel_token, input_text=input_text)
+            args.append(_password_argument(password))
+        return self._run(args, cancel_token=cancel_token)
 
     def extract_archive(
         self,
@@ -62,13 +58,9 @@ class SevenZipRunner:
     ) -> SevenZipResult:
         Path(output_dir).mkdir(parents=True, exist_ok=True)
         args = [self.executable, "x", str(archive), f"-o{output_dir}", "-y"]
-        input_text = None
         if password is not None:
-            if _password_requires_stdin(password):
-                input_text = f"{password}\n"
-            else:
-                args.append(f"-p{password}")
-        return self._run(args, cancel_token=cancel_token, input_text=input_text)
+            args.append(_password_argument(password))
+        return self._run(args, cancel_token=cancel_token)
 
     def extract_stego(
         self,
@@ -177,8 +169,9 @@ class SevenZipRunner:
         raise KeyUnpackError(ErrorCode.SEVENZIP_MISSING, "7-Zip executable not found")
 
 
-def _password_requires_stdin(password: str) -> bool:
-    return '"' in password
+def _password_argument(password: str) -> str:
+    # 7-Zip 在 Windows 上会再次解析参数内的引号，双写后才能表示字面量引号。
+    return "-p" + password.replace('"', '""')
 
 
 def classify_result(result: SevenZipResult) -> ErrorCode | None:

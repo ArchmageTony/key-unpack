@@ -1,0 +1,39 @@
+# Python 缓存
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Python 构建产物
+*.egg-info/
+build/
+dist/
+pip-wheel-metadata/
+
+# 本地虚拟环境
+.venv/
+venv/
+env/
+__pypackages__/
+
+# uv 本地运行产物
+uv.lock
+
+# 测试和工具缓存
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pyre/
+.tox/
+.nox/
+.hypothesis/
+.coverage
+.coverage.*
+htmlcov/
+.dmypy.json
+dmypy.json
+
+# 本地运行数据
+data/
+tmp/manual-ui-data/
+tmp/windows-plan-smoke-run/
+tmp/windows-ui-smoke-run/

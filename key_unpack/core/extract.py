@@ -155,6 +155,14 @@ def _extract_one(
         timeout_seconds=timeout,
     )
     temp_parent = request.temp_dir or app_config.temp_dir
+    if temp_parent is not None:
+        try:
+            Path(temp_parent).expanduser().mkdir(parents=True, exist_ok=True)
+        except PermissionError as exc:
+            raise KeyUnpackError(
+                ErrorCode.PERMISSION_DENIED,
+                f"Temporary directory is not writable: {temp_parent}",
+            ) from exc
     task_temp = Path(tempfile.mkdtemp(prefix="key-unpack-", dir=temp_parent))
     configured_output_dir = None
     if app_config.config.get("output_strategy") == "fixed":

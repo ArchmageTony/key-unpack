@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from PySide6.QtCore import QThread, Qt, Signal
-from PySide6.QtGui import QCloseEvent, QDragEnterEvent, QDropEvent
+from PySide6.QtGui import QCloseEvent, QDragEnterEvent, QDropEvent, QFont, QFontDatabase
 from PySide6.QtWidgets import (
     QApplication,
     QAbstractItemView,
@@ -72,6 +73,31 @@ ERROR_LABELS = {
     "canceled": "已取消",
     "unknown_error": "未知错误",
 }
+
+_APP_FONT_APPLIED = False
+
+
+def apply_default_font(app: QApplication) -> None:
+    global _APP_FONT_APPLIED
+    if _APP_FONT_APPLIED or sys.platform != "win32":
+        return
+    _APP_FONT_APPLIED = True
+    windows_dir = Path(os.environ.get("WINDIR", r"C:\Windows"))
+    for file_name in ("msyh.ttc", "msyh.ttf", "simhei.ttf", "simsun.ttc"):
+        font_path = windows_dir / "Fonts" / file_name
+        if not font_path.exists():
+            continue
+        font_id = QFontDatabase.addApplicationFont(str(font_path))
+        if font_id < 0:
+            continue
+        families = QFontDatabase.applicationFontFamilies(font_id)
+        if "Microsoft YaHei UI" in families:
+            app.setFont(QFont("Microsoft YaHei UI", 9))
+            return
+        if families:
+            app.setFont(QFont(families[0], 9))
+            return
+    app.setFont(QFont("Microsoft YaHei UI", 9))
 
 
 @dataclass
@@ -164,6 +190,9 @@ class DropArea(QFrame):
 class MainWindow(QMainWindow):
     def __init__(self, *, data_dir: str | None = None) -> None:
         super().__init__()
+        app = QApplication.instance()
+        if app is not None:
+            apply_default_font(app)
         self.data_dir = data_dir
         self.config = AppConfig.load(data_dir)
         self.store = PasswordStore(self.config.paths)
@@ -191,19 +220,55 @@ class MainWindow(QMainWindow):
         self.setStyleSheet(
             """
             QMainWindow { background: #f5f6f8; }
-            QWidget { font-size: 13px; }
+            QWidget { font-size: 13px; color: #20242a; }
             QTabWidget::pane, QGroupBox, QFrame#dropArea {
                 border: 1px solid #d7dbe2;
                 border-radius: 6px;
                 background: #ffffff;
             }
+            QTabBar::tab {
+                color: #20242a;
+                background: #eef1f5;
+                border: 1px solid #d7dbe2;
+                padding: 6px 14px;
+            }
+            QTabBar::tab:selected {
+                background: #ffffff;
+                border-bottom-color: #ffffff;
+            }
+            QTabBar::tab:disabled { color: #98a2b3; }
             QGroupBox { margin-top: 10px; padding-top: 14px; }
             QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 4px; }
             QFrame#dropArea { min-height: 118px; }
             QLabel#dropTitle { font-size: 20px; font-weight: 600; color: #20242a; }
             QLabel#dropSubtitle { color: #667085; }
-            QPushButton { min-height: 28px; padding: 4px 10px; }
-            QTableWidget { background: #ffffff; alternate-background-color: #f8fafc; }
+            QPushButton {
+                min-height: 28px;
+                padding: 4px 10px;
+                color: #20242a;
+                background: #ffffff;
+                border: 1px solid #c8ced8;
+                border-radius: 4px;
+            }
+            QPushButton:disabled {
+                color: #98a2b3;
+                background: #f1f3f5;
+                border-color: #d7dbe2;
+            }
+            QRadioButton, QCheckBox { color: #20242a; }
+            QRadioButton:disabled, QCheckBox:disabled { color: #98a2b3; }
+            QTableWidget {
+                color: #20242a;
+                background: #ffffff;
+                alternate-background-color: #f8fafc;
+                gridline-color: #d7dbe2;
+            }
+            QHeaderView::section {
+                color: #20242a;
+                background: #f1f3f5;
+                border: 1px solid #d7dbe2;
+                padding: 3px;
+            }
             """
         )
 
@@ -487,13 +552,15 @@ class MainWindow(QMainWindow):
             progress = f"{event.file_index}/{event.file_count}"
         if event.password_index is not None and event.password_count is not None:
             progress = f"{progress} 密码 {event.password_index}/{event.password_count}".strip()
-        message = event.message
+        message = stage if event.type in {"started", "password_test", "stage"} else event.message
         output_dir = ""
         if event.error_code:
             message = ERROR_LABELS.get(event.error_code, event.message)
         if event.result is not None:
             output_dir = event.result.output_dir or ""
-            if event.result.message:
+            if event.result.success:
+                message = "已解压完成"
+            elif event.result.message:
                 message = ERROR_LABELS.get(event.result.error_code or "", event.result.message)
         self._set_task_items(row, status, progress, stage, message, output_dir)
 
